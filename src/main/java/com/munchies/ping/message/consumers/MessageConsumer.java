@@ -15,6 +15,6 @@ public class MessageConsumer {
 	
 	@EventListener({MessageEvent.class})
 	public void consume(MessageEvent event) {
-		logger.info("Sending to SQS {} ", event.getMessage());
+		logger.info("Sending to SQS,  captain was {} ", event.getMessage().getCaptain());
 	}
 }

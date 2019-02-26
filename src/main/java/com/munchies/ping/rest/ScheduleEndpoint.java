@@ -19,7 +19,7 @@ import com.munchies.ping.message.Message;
 import com.munchies.ping.scheduler.Scheduler;
 
 @RestController
-@RequestMapping(consumes=MediaType.APPLICATION_JSON_UTF8_VALUE, produces=MediaType.APPLICATION_JSON_UTF8_VALUE)
+@RequestMapping(consumes=MediaType.APPLICATION_JSON_VALUE, produces=MediaType.APPLICATION_JSON_VALUE)
 public class ScheduleEndpoint {
 
 	@Autowired Scheduler scheduler;
@@ -28,9 +28,16 @@ public class ScheduleEndpoint {
 	private ApplicationEventPublisher publisher; 
 	
 	@PostMapping(path="schedule")
-	public @ResponseBody ResponseEntity<HttpStatus> schedule(@RequestBody Message message) {
+	public @ResponseBody ResponseEntity<HttpStatus> schedule(@RequestBody(required=true) Message message) {
 		publisher.publishEvent(new MessageEvent(message));
 		scheduler.schedule(message, Optional.empty());
+		return new ResponseEntity<>(HttpStatus.OK);
+	}
+	
+	@PostMapping(path="scheduleAt/{seconds}")
+	public @ResponseBody ResponseEntity<HttpStatus> scheduleAt(@PathVariable(name="seconds", required=true) Long seconds, @RequestBody(required=true) Message message) {
+		publisher.publishEvent(new MessageEvent(message));
+		scheduler.schedule(message, Optional.of(seconds));
 		return new ResponseEntity<>(HttpStatus.OK);
 	}
 }
