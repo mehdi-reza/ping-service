@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.Comparator;
 import java.util.Optional;
 import java.util.PriorityQueue;
+import java.util.concurrent.DelayQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,16 +32,12 @@ public class SchedulerService implements Scheduler {
 
 	@Override
 	public boolean schedule(Message message, Optional<Long> seconds) {
-		
-		long scheduleAt = 
-		seconds.map(s -> Clock.offset(Clock.systemDefaultZone(), Duration.ofSeconds(s)).millis())
-		.orElse(Clock.offset(Clock.systemDefaultZone(), defaultFrequency).millis());
 
-		return queue.add(new ScheduledMessage(message, scheduleAt, Duration.ofSeconds(seconds.orElse(defaultFrequency.getSeconds()))));
-	}
+		long scheduleAt = seconds.map(s -> Clock.offset(Clock.systemDefaultZone(), Duration.ofSeconds(s)).millis())
+				.orElse(Clock.offset(Clock.systemDefaultZone(), defaultFrequency).millis());
 
-	@Override
-	public void scheduleAfter(Message message, Duration after) {
+		return queue.add(new ScheduledMessage(message, scheduleAt,
+				Duration.ofSeconds(seconds.orElse(defaultFrequency.getSeconds()))));
 	}
 
 	public void start() {
@@ -52,38 +49,22 @@ public class SchedulerService implements Scheduler {
 		throw new RuntimeException("Already started..");
 	}
 
-	private PriorityQueue<ScheduledMessage> queue = new PriorityQueue<>(
-			Comparator.<ScheduledMessage>comparingLong(m -> m.getSchedulingTime()));
+	private DelayQueue<ScheduledMessage> queue = new DelayQueue<>();
 
 	private Runnable worker = () -> {
 		while (true) {
-
-			Optional<ScheduledMessage> available = Optional.ofNullable(queue.peek());
-
-			if (!available.isPresent()) {
-				logger.debug("No message found in queue, sleeping for 3 seconds");
-				try {
-					Thread.sleep(3000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				continue;
-			}
-
-			ScheduledMessage message = available.get();
-
-			if (System.currentTimeMillis() >= message.getSchedulingTime()) {
-				publisher.publishEvent(new MessageEvent(queue.poll().getMessage()));
-
+			
+			ScheduledMessage message;
+			try {
+				//blocking call
+				message = queue.take();
+				publisher.publishEvent(new MessageEvent(message.getMessage()));
+				
 				// reschedule
 				schedule(message.getMessage(), Optional.of(message.getDuration().getSeconds()));
-			} else {
-				try {
-					Thread.sleep(message.getSchedulingTime() - System.currentTimeMillis());
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-			}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			} 			
 		}
 	};
 }

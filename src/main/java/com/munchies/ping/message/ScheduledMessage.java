@@ -2,8 +2,10 @@ package com.munchies.ping.message;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
 
-public class ScheduledMessage {
+public class ScheduledMessage implements Delayed {
 
 	private Message message;
 	
@@ -42,5 +44,16 @@ public class ScheduledMessage {
 	@Override
 	public int hashCode() {
 		return Objects.hash(message.getCaptain(), schedulingTime);
+	}
+
+	@Override
+	public int compareTo(Delayed other) {
+		ScheduledMessage message=(ScheduledMessage)other;
+		return getSchedulingTime() < message.getSchedulingTime() ? -1 : 1;
+	}
+
+	@Override
+	public long getDelay(TimeUnit unit) {
+		return unit.convert(getSchedulingTime() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
 	}
 }
